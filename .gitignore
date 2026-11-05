@@ -16,3 +16,6 @@ appsettings.*.local.json
 # Divers
 .DS_Store
 Thumbs.db
+
+# Sauvegardes PostgreSQL du VPS
+sauvegardes/

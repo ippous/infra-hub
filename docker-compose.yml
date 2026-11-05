@@ -1,35 +1,48 @@
 name: infrahub
 
+# Images publiées par GitHub Actions sur ghcr.io. Sans INFRAHUB_TAG, on prend « latest ».
+# En local, « docker compose up --build » reconstruit à partir des sources.
+
+x-base: &base
+  restart: unless-stopped
+  networks: [interne]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
 services:
   web:
+    <<: *base
+    image: ghcr.io/ippous/infra-hub-web:${INFRAHUB_TAG:-latest}
     build:
       context: .
       dockerfile: deploy/Dockerfile.web
-    restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__InfraHub: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      DataProtection__Dossier: /keys
+    volumes:
+      - web-keys:/keys
     depends_on:
       db:
         condition: service_healthy
-    networks: [interne]
 
   agent:
+    <<: *base
+    image: ghcr.io/ippous/infra-hub-agent:${INFRAHUB_TAG:-latest}
     build:
       context: .
       dockerfile: deploy/Dockerfile.agent
-    restart: unless-stopped
     environment:
       DOTNET_ENVIRONMENT: Production
       ConnectionStrings__InfraHub: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
     depends_on:
       db:
         condition: service_healthy
-    networks: [interne]
 
   db:
+    <<: *base
     image: postgres:17
-    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -41,25 +54,51 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks: [interne]
+
+  # Sauvegarde quotidienne (pg_dump compressé), 14 jours conservés dans ./sauvegardes
+  sauvegarde:
+    <<: *base
+    image: postgres:17
+    environment:
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./sauvegardes:/sauvegardes
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          f=/sauvegardes/infrahub-$$(date +%Y%m%d-%H%M).sql.gz
+          pg_dump --no-owner | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "sauvegarde $$f"
+          find /sauvegardes -name 'infrahub-*.sql.gz' -mtime +14 -delete
+          sleep 86400
+        done
+    depends_on:
+      db:
+        condition: service_healthy
 
   caddy:
+    <<: *base
     image: caddy:2
-    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     environment:
       INFRAHUB_DOMAIN: ${INFRAHUB_DOMAIN}
+      INFRAHUB_UTILISATEUR: ${INFRAHUB_UTILISATEUR}
+      INFRAHUB_MOT_DE_PASSE_HASH: ${INFRAHUB_MOT_DE_PASSE_HASH}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on: [web]
-    networks: [interne]
 
 volumes:
   db-data:
+  web-keys:
   caddy-data:
   caddy-config:
 

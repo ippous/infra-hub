@@ -73,13 +73,8 @@ dotnet ef migrations add <Nom> --project src/InfraHub.Core --startup-project src
 
 ## Déployer sur le VPS
 
-```bash
-cp .env.example .env    # puis renseigner le domaine et le mot de passe PostgreSQL
-docker compose up -d --build
-```
-
-Le DNS du domaine choisi doit pointer vers l'IP du VPS ; Caddy obtient le certificat tout seul.
-Avant la sortie officielle de .NET 11 (10 novembre 2026), l'étiquette d'image `11.0` peut ne pas exister : passer `--build-arg DOTNET_TAG=<tag RC>` si besoin.
+Déploiement automatique depuis GitHub Actions (images sur ghcr.io, puis `docker compose` sur le VPS en SSH).
+Mise en place pas à pas : [docs/hebergement.md](docs/hebergement.md).
 
 ## Feuille de route
 

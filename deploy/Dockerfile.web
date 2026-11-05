@@ -13,6 +13,8 @@ RUN dotnet publish src/InfraHub.Web/InfraHub.Web.csproj -c Release -o /app --no-
 FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_TAG} AS runtime
 WORKDIR /app
 COPY --from=build /app .
+# Clés ASP.NET Data Protection persistées dans un volume (sessions valides après redéploiement)
+RUN mkdir -p /keys && chown $APP_UID /keys
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 USER $APP_UID

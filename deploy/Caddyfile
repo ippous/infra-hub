@@ -2,5 +2,19 @@
 # Le DNS de {$INFRAHUB_DOMAIN} doit pointer vers l'IP du VPS.
 {$INFRAHUB_DOMAIN} {
 	encode zstd gzip
+
+	# Protection provisoire tant que l'interface n'a pas sa propre authentification.
+	# Hash à générer avec : docker run --rm caddy:2 caddy hash-password
+	basic_auth {
+		{$INFRAHUB_UTILISATEUR} {$INFRAHUB_MOT_DE_PASSE_HASH}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
 	reverse_proxy web:8080
 }
