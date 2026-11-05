@@ -47,6 +47,7 @@ public enum Canal
     Mcp,
     Agent,
     Systeme,
+    Import,
 }
 
 /// <summary>Nature d'une entrée du journal d'audit.</summary>

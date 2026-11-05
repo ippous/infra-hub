@@ -29,6 +29,7 @@ public static class ExtensionsServices
         services.AddScoped<ServiceInventaire>();
         services.AddScoped<ServiceObservations>();
         services.AddScoped<ServiceTypes>();
+        services.AddScoped<ServiceImport>();
         services.AddScoped<InitialiseurBase>();
         return services;
     }
