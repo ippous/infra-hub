@@ -2,6 +2,9 @@ name: infrahub
 
 # Images publiées par GitHub Actions sur ghcr.io. Sans INFRAHUB_TAG, on prend « latest ».
 # En local, « docker compose up --build » reconstruit à partir des sources.
+# Deux modes, choisis par COMPOSE_FILE dans .env :
+#   docker-compose.yml:docker-compose.tls.yml    Caddy prend les ports 80/443 et gère le TLS
+#   docker-compose.yml:docker-compose.proxy.yml  un proxy existant gère le TLS et transmet à infrahub-caddy:80
 
 x-base: &base
   restart: unless-stopped
@@ -79,15 +82,13 @@ services:
       db:
         condition: service_healthy
 
+  # Ports publiés : voir docker-compose.tls.yml (Caddy autonome) ou docker-compose.proxy.yml
+  # (derrière un proxy déjà présent sur le serveur). Le choix se fait par COMPOSE_FILE dans .env.
   caddy:
     <<: *base
     image: caddy:2
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
     environment:
-      INFRAHUB_DOMAIN: ${INFRAHUB_DOMAIN}
+      INFRAHUB_ADRESSE: ${INFRAHUB_ADRESSE:-${INFRAHUB_DOMAIN}}
       INFRAHUB_UTILISATEUR: ${INFRAHUB_UTILISATEUR}
       INFRAHUB_MOT_DE_PASSE_HASH: ${INFRAHUB_MOT_DE_PASSE_HASH}
     volumes:

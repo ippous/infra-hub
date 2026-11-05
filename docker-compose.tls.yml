@@ -1,0 +1,7 @@
+# Mode autonome : Caddy d'Infra Hub publie 80/443 et obtient lui-même le certificat.
+services:
+  caddy:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"

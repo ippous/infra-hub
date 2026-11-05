@@ -1,0 +1,16 @@
+# Mode « derrière un proxy » : un reverse proxy déjà présent sur le serveur termine le TLS
+# et transmet les requêtes à infrahub-caddy:80 sur le réseau Docker INFRAHUB_RESEAU_PROXY.
+# Caddy d'Infra Hub ne publie aucun port ; il garde l'authentification et les en-têtes.
+services:
+  caddy:
+    environment:
+      INFRAHUB_ADRESSE: ":80"
+    networks:
+      interne: {}
+      proxy:
+        aliases: [infrahub-caddy]
+
+networks:
+  proxy:
+    external: true
+    name: ${INFRAHUB_RESEAU_PROXY:-proxy-partage}

@@ -31,11 +31,18 @@ fi
 echo "Déploiement de la version $REVISION (précédente : ${ACTUELLE:-aucune})"
 BASE="https://raw.githubusercontent.com/$DEPOT/$REVISION"
 mkdir -p deploy
-curl -fsSL "$BASE/docker-compose.yml" -o docker-compose.yml.nouveau
+FICHIERS="docker-compose.yml docker-compose.tls.yml docker-compose.proxy.yml"
+for f in $FICHIERS; do
+  curl -fsSL "$BASE/$f" -o "$f.nouveau"
+done
 curl -fsSL "$BASE/deploy/Caddyfile" -o deploy/Caddyfile.nouveau
 curl -fsSL "$BASE/deploy/infrahub-maj.sh" -o infrahub-maj.sh.nouveau
-mv docker-compose.yml.nouveau docker-compose.yml
-mv deploy/Caddyfile.nouveau deploy/Caddyfile
+for f in $FICHIERS; do mv "$f.nouveau" "$f"; done
+# Caddyfile monté en fichier unique : réécrire en place (même inode) pour que le conteneur voie la nouvelle version.
+cat deploy/Caddyfile.nouveau > deploy/Caddyfile && rm deploy/Caddyfile.nouveau
+
+# .env d'avant les deux modes : Caddy autonome par défaut.
+grep -q '^COMPOSE_FILE=' .env || echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.tls.yml' >> .env
 
 if [ "$REVISION" != main ]; then
   # Version figée sur le commit : les images « latest » peuvent avancer pendant le déploiement.

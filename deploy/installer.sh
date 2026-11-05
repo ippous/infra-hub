@@ -3,11 +3,24 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/ippous/infra-hub/main/deploy/installer.sh | bash -s -- infra.jaume-eric.com
 #
-# Ne touche ni à la configuration SSH ni aux services existants. S'arrête si les ports 80/443 sont déjà pris.
-# Peut être relancé sans risque : le .env existant est conservé.
+# Si un reverse proxy occupe déjà 80/443 sur le serveur, ajouter le réseau Docker où il tourne :
+#
+#   … | bash -s -- infra.jaume-eric.com --derriere-proxy shetland-registre_default
+#
+# Le proxy doit alors transmettre le domaine à infrahub-caddy:80 (voir docs/hebergement.md).
+# Ne touche ni à la configuration SSH ni aux services existants. En mode autonome, s'arrête si 80/443 sont pris.
+# Peut être relancé sans risque : les secrets du .env existant sont conservés.
 set -euo pipefail
 
-DOMAINE="${1:-infra.jaume-eric.com}"
+DOMAINE="infra.jaume-eric.com"
+RESEAU_PROXY=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --derriere-proxy) RESEAU_PROXY="${2:?nom du réseau Docker du proxy attendu}"; shift 2 ;;
+    -*) echo "Option inconnue : $1" >&2; exit 1 ;;
+    *) DOMAINE="$1"; shift ;;
+  esac
+done
 DOSSIER="${INFRAHUB_DIR:-/opt/infrahub}"
 UTILISATEUR_WEB="${INFRAHUB_UTILISATEUR:-eric}"
 DEPOT="ippous/infra-hub"
@@ -25,7 +38,7 @@ command -v ss >/dev/null || stop "commande ss introuvable : impossible de vérif
 . /etc/os-release && echo "Système : $PRETTY_NAME"
 echo "Mémoire : $(free -h | awk '/Mem:/ {print $2}') — disque libre : $(df -h / | awk 'NR==2 {print $4}')"
 PORTS=$(ss -Htlnp 2>/dev/null | awk '{print $4, $6}' || true)
-for p in 80 443; do
+for p in $([ -z "$RESEAU_PROXY" ] && echo 80 443); do
   if echo "$PORTS" | grep -E "[:.]$p " | grep -vq docker-proxy; then
     echo "$PORTS" | grep -E "[:.]$p "
     stop "le port $p est déjà utilisé par un autre service (voir ci-dessus). Infra Hub a besoin de 80 et 443."
@@ -75,7 +88,22 @@ INFRAHUB_TAG=latest
 ENV
   echo ".env créé (mot de passe PostgreSQL et accès web générés)."
 else
-  echo ".env existant conservé."
+  echo ".env existant conservé (secrets inchangés)."
+fi
+
+# Mode de publication (réglé à chaque passage, secrets inchangés)
+regler() { sed -i "/^$1=/d" .env; echo "$1=$2" >> .env; }
+regler INFRAHUB_DOMAIN "$DOMAINE"
+if [ -n "$RESEAU_PROXY" ]; then
+  docker network inspect "$RESEAU_PROXY" >/dev/null 2>&1 \
+    || stop "réseau Docker « $RESEAU_PROXY » introuvable (docker network ls)."
+  regler COMPOSE_FILE docker-compose.yml:docker-compose.proxy.yml
+  regler INFRAHUB_RESEAU_PROXY "$RESEAU_PROXY"
+  echo "Mode : derrière le proxy du réseau « $RESEAU_PROXY » (cible : infrahub-caddy:80)."
+else
+  regler COMPOSE_FILE docker-compose.yml:docker-compose.tls.yml
+  sed -i '/^INFRAHUB_RESEAU_PROXY=/d' .env
+  echo "Mode : Caddy autonome sur 80/443."
 fi
 
 titre "Mise à jour automatique"

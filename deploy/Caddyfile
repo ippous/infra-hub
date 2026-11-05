@@ -1,6 +1,13 @@
-# Caddy obtient et renouvelle le certificat TLS automatiquement.
-# Le DNS de {$INFRAHUB_DOMAIN} doit pointer vers l'IP du VPS.
-{$INFRAHUB_DOMAIN} {
+# Adresse du site : le domaine en mode autonome (TLS automatique), « :80 » derrière un proxy existant.
+# En mode autonome, le DNS de {$INFRAHUB_DOMAIN} doit pointer vers l'IP du VPS.
+{
+	servers {
+		# Derrière un proxy du même serveur : faire confiance à ses en-têtes X-Forwarded-*.
+		trusted_proxies static private_ranges
+	}
+}
+
+{$INFRAHUB_ADRESSE} {
 	encode zstd gzip
 
 	# Protection provisoire tant que l'interface n'a pas sa propre authentification.

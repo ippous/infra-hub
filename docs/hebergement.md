@@ -26,6 +26,36 @@ Services : `caddy` (TLS automatique, mot de passe provisoire), `web`, `agent`, `
 3. **Noter le mot de passe d'accès** affiché à la fin (utilisateur `eric`) dans le gestionnaire de mots de passe : il n'est affiché qu'une fois.
 4. **DNS** : le script affiche l'IP du VPS. Dans la zone DNS de `jaume-eric.com`, ajouter un enregistrement **A** `infra` → cette IP. Caddy obtient le certificat dès que le DNS répond.
 
+## Mode derrière un proxy existant (cas de srv1763947)
+
+Sur ce VPS, les ports sont déjà pris : 443 par le Caddy de `shetland-registre`, 80 par le site PHP de `programmeelevage`. Infra Hub passe donc par le Caddy de shetland, qui termine le TLS (certificat obtenu sur 443, sans le port 80) et transmet à `infrahub-caddy:80` sur le réseau Docker `shetland-registre_default`. Le Caddy d'Infra Hub ne publie aucun port et garde le mot de passe et les en-têtes.
+
+```
+Internet ─► :443 Caddy shetland ─┬─► shetland-registre.jaume-eric.com (fichiers)
+                                 └─► infra.jaume-eric.com ─► infrahub-caddy:80 (mot de passe) ─► web:8080
+```
+
+Installation (ou passage à ce mode) :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ippous/infra-hub/main/deploy/installer.sh | bash -s -- infra.jaume-eric.com --derriere-proxy shetland-registre_default
+```
+
+Côté shetland, un bloc ajouté à `/opt/shetland-registre/Caddyfile` (une sauvegarde est faite avant) :
+
+```
+infra.jaume-eric.com {
+    reverse_proxy infrahub-caddy:80
+    tls {
+        issuer acme {
+            disable_http_challenge
+        }
+    }
+}
+```
+
+puis `docker exec shetland-registre-web-1 caddy reload --config /etc/caddy/Caddyfile`. Pour revenir en arrière : remettre `Caddyfile.avant-infrahub` et recharger.
+
 ## Exploitation
 
 ```bash
