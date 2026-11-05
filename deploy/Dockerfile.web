@@ -1,0 +1,19 @@
+# Contexte de build : racine du dépôt (voir docker-compose.yml)
+ARG DOTNET_TAG=11.0
+
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_TAG} AS build
+WORKDIR /src
+COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY src/InfraHub.Core/InfraHub.Core.csproj src/InfraHub.Core/
+COPY src/InfraHub.Web/InfraHub.Web.csproj src/InfraHub.Web/
+RUN dotnet restore src/InfraHub.Web/InfraHub.Web.csproj
+COPY src/ src/
+RUN dotnet publish src/InfraHub.Web/InfraHub.Web.csproj -c Release -o /app --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_TAG} AS runtime
+WORKDIR /app
+COPY --from=build /app .
+ENV ASPNETCORE_HTTP_PORTS=8080
+EXPOSE 8080
+USER $APP_UID
+ENTRYPOINT ["dotnet", "InfraHub.Web.dll"]

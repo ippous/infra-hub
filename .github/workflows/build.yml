@@ -1,0 +1,26 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+          dotnet-quality: 'preview' # à retirer après la sortie officielle de .NET 11
+
+      - name: Restore
+        run: dotnet restore InfraHub.slnx
+
+      - name: Build
+        run: dotnet build InfraHub.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test InfraHub.slnx -c Release --no-build

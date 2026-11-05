@@ -1,0 +1,18 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+TestResults/
+*.trx
+
+# Secrets / environnement
+.env
+appsettings.*.local.json
+
+# Divers
+.DS_Store
+Thumbs.db
