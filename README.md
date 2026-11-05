@@ -2,7 +2,7 @@
 
 Inventaire vivant de mes **environnements** (VPS, NAS, PaaS, bases managées, domaines…) et de mes **développements** (sites, applis, code source, outils), avec leurs relations, leur état et un assistant IA.
 
-> État : squelette initial. Les fonctionnalités arrivent après validation du schéma de données.
+> État : schéma de données en place (voir [docs/schema.md](docs/schema.md)). Prochaine étape : écrans d'inventaire.
 
 ## Architecture
 
@@ -48,11 +48,27 @@ docker-compose.yml
 
 ## Démarrer en local
 
-Prérequis : SDK .NET 11 (RC3 ou version finale).
+Prérequis : SDK .NET 11 (RC3 ou version finale) et un PostgreSQL local (`infrahub` / `infrahub`, voir `appsettings.Development.json`).
 
 ```bash
 dotnet build InfraHub.slnx
-dotnet run --project src/InfraHub.Web
+dotnet run --project src/InfraHub.Web    # applique les migrations au démarrage
+```
+
+### Tests
+
+Les tests d'intégration créent une base jetable par test sur le serveur indiqué par `INFRAHUB_TEST_PG` ; sans cette variable, ils sont ignorés.
+
+```bash
+export INFRAHUB_TEST_PG="Host=localhost;Database=postgres;Username=infrahub;Password=infrahub"
+dotnet test --solution InfraHub.slnx
+```
+
+### Migrations
+
+```bash
+dotnet tool restore
+dotnet ef migrations add <Nom> --project src/InfraHub.Core --startup-project src/InfraHub.Core --output-dir Donnees/Migrations
 ```
 
 ## Déployer sur le VPS

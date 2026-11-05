@@ -8,6 +8,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: infrahub
+          POSTGRES_PASSWORD: infrahub
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U infrahub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      INFRAHUB_TEST_PG: Host=localhost;Port=5432;Database=postgres;Username=infrahub;Password=infrahub
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,4 +44,9 @@ jobs:
         run: dotnet build InfraHub.slnx -c Release --no-restore
 
       - name: Test
-        run: dotnet test InfraHub.slnx -c Release --no-build
+        run: dotnet test --solution InfraHub.slnx -c Release --no-build
+
+      - name: Migrations à jour
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/InfraHub.Core --startup-project src/InfraHub.Core --no-build --configuration Release
