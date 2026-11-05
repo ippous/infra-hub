@@ -20,6 +20,8 @@ stop() { printf '\n\033[31mArrêt : %s\033[0m\n' "$1" >&2; exit 1; }
 command -v apt-get >/dev/null || stop "système non pris en charge (Ubuntu ou Debian attendu)."
 
 titre "Vérifications"
+command -v ss >/dev/null || { apt-get update -q >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -yq iproute2 >/dev/null; }
+command -v ss >/dev/null || stop "commande ss introuvable : impossible de vérifier les ports."
 . /etc/os-release && echo "Système : $PRETTY_NAME"
 echo "Mémoire : $(free -h | awk '/Mem:/ {print $2}') — disque libre : $(df -h / | awk 'NR==2 {print $4}')"
 PORTS=$(ss -Htlnp 2>/dev/null | awk '{print $4, $6}' || true)

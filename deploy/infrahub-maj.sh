@@ -13,8 +13,11 @@ exec 9>"$DOSSIER/.maj.lock"
 flock -n 9 || { echo "Mise à jour déjà en cours."; exit 0; }
 cd "$DOSSIER"
 
-docker pull -q "$IMAGE_WEB" >/dev/null
-docker pull -q "$IMAGE_AGENT" >/dev/null
+# Un échec réseau passager ne doit pas arrêter le service : on garde alors les images présentes.
+for image in "$IMAGE_WEB" "$IMAGE_AGENT"; do
+  docker pull -q "$image" >/dev/null || echo "Téléchargement de $image impossible, image locale conservée." >&2
+done
+docker image inspect "$IMAGE_WEB" "$IMAGE_AGENT" >/dev/null 2>&1 || { echo "Images absentes." >&2; exit 1; }
 
 REVISION=$(docker image inspect "$IMAGE_WEB" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)
 [ -n "$REVISION" ] || REVISION=main
@@ -40,7 +43,7 @@ if [ "$REVISION" != main ]; then
   docker tag "$IMAGE_AGENT" "ghcr.io/ippous/infra-hub-agent:$REVISION"
 fi
 export INFRAHUB_TAG="$REVISION"
-docker compose pull -q db caddy sauvegarde
+docker compose pull -q db caddy sauvegarde || echo "Images tierces non mises à jour." >&2
 docker compose up -d --no-build --remove-orphans
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
 
