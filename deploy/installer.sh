@@ -30,6 +30,14 @@ for p in 80 443; do
     echo "$PORTS" | grep -E "[:.]$p "
     stop "le port $p est déjà utilisé par un autre service (voir ci-dessus). Infra Hub a besoin de 80 et 443."
   fi
+  # Port publié par Docker : accepté seulement s'il appartient déjà à Infra Hub.
+  if command -v docker >/dev/null; then
+    AUTRE=$(docker ps --filter "publish=$p" --format '{{.Names}} ({{.Image}}) projet={{.Label "com.docker.compose.project"}}' | grep -v 'projet=infrahub$' || true)
+    if [ -n "$AUTRE" ]; then
+      echo "$AUTRE"
+      stop "le port $p est publié par un autre conteneur Docker (voir ci-dessus). Infra Hub a besoin de 80 et 443."
+    fi
+  fi
 done
 AUTRES=$(echo "$PORTS" | awk '{print $1}' | grep -vE '(^127\.|^\[::1\]|:22$|:53$|:80$|:443$)' | sort -u || true)
 [ -z "$AUTRES" ] || { echo "Autres ports ouverts (laissés tels quels) :"; echo "$AUTRES"; }
