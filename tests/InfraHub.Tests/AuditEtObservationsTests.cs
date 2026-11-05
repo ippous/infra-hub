@@ -14,7 +14,7 @@ public class AuditEtObservationsTests : BaseDeTest
         Guid id;
         await using (var db = NouveauContexte())
         {
-            id = (await new ServiceInventaire(db).CreerElementAsync(
+            id = (await new ServiceInventaire(Fabrique).CreerElementAsync(
                 new("vps", "VPS", Attributs: JsonDocument.Parse("""{"os":"Ubuntu 24.04"}""")), Ct)).Id;
         }
 
@@ -22,7 +22,7 @@ public class AuditEtObservationsTests : BaseDeTest
         Contexte.Canal = Canal.Ui;
         await using (var db = NouveauContexte())
         {
-            await new ServiceInventaire(db).ModifierAttributsAsync(id, JsonDocument.Parse("""{"os":"Ubuntu 26.04"}"""), Ct);
+            await new ServiceInventaire(Fabrique).ModifierAttributsAsync(id, JsonDocument.Parse("""{"os":"Ubuntu 26.04"}"""), Ct);
         }
 
         await using var verif = NouveauContexte();
@@ -55,7 +55,7 @@ public class AuditEtObservationsTests : BaseDeTest
         Guid id;
         await using (var db = NouveauContexte())
         {
-            id = (await new ServiceInventaire(db).CreerElementAsync(new("site", "Site"), Ct)).Id;
+            id = (await new ServiceInventaire(Fabrique).CreerElementAsync(new("site", "Site"), Ct)).Id;
         }
 
         Horloge.Avancer(TimeSpan.FromMinutes(5));
@@ -81,7 +81,7 @@ public class AuditEtObservationsTests : BaseDeTest
         Guid id;
         await using (var db = NouveauContexte())
         {
-            id = (await new ServiceInventaire(db).CreerElementAsync(new("site", "Site"), Ct)).Id;
+            id = (await new ServiceInventaire(Fabrique).CreerElementAsync(new("site", "Site"), Ct)).Id;
             var service = new ServiceObservations(db, Horloge, Retention());
             await service.EnregistrerAsync(id, "http", EtatSante.Ok, ct: Ct);
             Horloge.Avancer(TimeSpan.FromDays(60));

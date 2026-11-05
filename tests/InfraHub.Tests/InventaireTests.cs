@@ -32,7 +32,7 @@ public class InventaireTests : BaseDeTest
     public async Task Creer_element_fabrique_un_slug_unique()
     {
         await using var db = NouveauContexte();
-        var service = new ServiceInventaire(db);
+        var service = new ServiceInventaire(Fabrique);
 
         var premier = await service.CreerElementAsync(new("site", "Moulin Frat"), Ct);
         var second = await service.CreerElementAsync(new("site", "Moulin Frat"), Ct);
@@ -46,7 +46,7 @@ public class InventaireTests : BaseDeTest
     public async Task Creer_element_refuse_un_type_inconnu_ou_des_attributs_invalides()
     {
         await using var db = NouveauContexte();
-        var service = new ServiceInventaire(db);
+        var service = new ServiceInventaire(Fabrique);
 
         await Assert.ThrowsAsync<ErreurMetier>(() => service.CreerElementAsync(new("frigo", "Frigo"), Ct));
 
@@ -62,7 +62,7 @@ public class InventaireTests : BaseDeTest
         Guid id;
         await using (var db = NouveauContexte())
         {
-            var element = await new ServiceInventaire(db).CreerElementAsync(new(
+            var element = await new ServiceInventaire(Fabrique).CreerElementAsync(new(
                 "vps", "VPS Hostinger",
                 Attributs: JsonDocument.Parse("""{"fournisseur":"Hostinger","ip":"203.0.113.10"}"""),
                 Etiquettes: ["prod", "docker"]), Ct);
@@ -72,7 +72,7 @@ public class InventaireTests : BaseDeTest
         await using var verif = NouveauContexte();
         var relu = await verif.Elements.SingleAsync(e => e.Id == id, Ct);
         Assert.Equal("Hostinger", relu.Attributs.RootElement.GetProperty("fournisseur").GetString());
-        Assert.Equal(["prod", "docker"], relu.Etiquettes);
+        Assert.Equal(["docker", "prod"], relu.Etiquettes);
         Assert.Equal(StatutElement.Actif, relu.Statut);
 
         var parEtiquette = await verif.Elements.Where(e => e.Etiquettes.Contains("docker")).CountAsync(Ct);
@@ -83,7 +83,7 @@ public class InventaireTests : BaseDeTest
     public async Task Relations_refusent_boucles_et_doublons()
     {
         await using var db = NouveauContexte();
-        var service = new ServiceInventaire(db);
+        var service = new ServiceInventaire(Fabrique);
         var vps = await service.CreerElementAsync(new("vps", "VPS"), Ct);
         var conteneur = await service.CreerElementAsync(new("conteneur", "Caddy"), Ct);
         var site = await service.CreerElementAsync(new("site", "Site"), Ct);
@@ -106,17 +106,15 @@ public class InventaireTests : BaseDeTest
     public async Task Supprimer_un_element_supprime_ses_dependances()
     {
         await using var db = NouveauContexte();
-        var service = new ServiceInventaire(db);
+        var service = new ServiceInventaire(Fabrique);
         var vps = await service.CreerElementAsync(new("vps", "VPS"), Ct);
         var site = await service.CreerElementAsync(new("site", "Site"), Ct);
         await service.RelierAsync(site.Id, TypesRelationInitiaux.HebergeSur, vps.Id, ct: Ct);
         await service.AjouterNoteAsync(vps.Id, "Migré en Ubuntu 26.04", ct: Ct);
-        db.Secrets.Add(new ReferenceSecret { ElementId = vps.Id, Libelle = "SSH", Reference = "op://Infra/VPS/ssh" });
-        db.Liens.Add(new Lien { ElementId = vps.Id, Libelle = "Console", Url = new Uri("https://hpanel.hostinger.com") });
-        await db.SaveChangesAsync(Ct);
+        await service.AjouterSecretAsync(vps.Id, "SSH", "op://Infra/VPS/ssh", Ct);
+        await service.AjouterLienAsync(vps.Id, "Console", "https://hpanel.hostinger.com", Ct);
 
-        db.Elements.Remove(vps);
-        await db.SaveChangesAsync(Ct);
+        await service.SupprimerElementAsync(vps.Id, Ct);
 
         await using var verif = NouveauContexte();
         Assert.Equal(0, await verif.Relations.CountAsync(Ct));

@@ -21,11 +21,14 @@ public static class ExtensionsServices
 
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ContexteOperation>();
-        services.AddDbContext<InfraHubDbContext>(o => o.UseNpgsql(chaine));
+        // Fabrique à portée « scoped » : elle injecte le ContexteOperation de la portée dans chaque contexte créé.
+        // Elle enregistre aussi InfraHubDbContext lui-même (scoped) pour l'initialisation et les tâches courtes.
+        services.AddDbContextFactory<InfraHubDbContext>(o => o.UseNpgsql(chaine), ServiceLifetime.Scoped);
         services.Configure<OptionsObservations>(configuration.GetSection(OptionsObservations.Section));
 
         services.AddScoped<ServiceInventaire>();
         services.AddScoped<ServiceObservations>();
+        services.AddScoped<ServiceTypes>();
         services.AddScoped<InitialiseurBase>();
         return services;
     }

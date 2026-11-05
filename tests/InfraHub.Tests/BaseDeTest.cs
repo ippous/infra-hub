@@ -29,6 +29,14 @@ public abstract class BaseDeTest : IAsyncLifetime
     internal HorlogeDeTest Horloge { get; } = new(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero));
     internal ContexteOperation Contexte { get; } = new();
 
+    /// <summary>Fabrique passée aux services : chaque opération obtient un contexte neuf.</summary>
+    internal IDbContextFactory<InfraHubDbContext> Fabrique => new FabriqueDeTest(this);
+
+    private sealed class FabriqueDeTest(BaseDeTest test) : IDbContextFactory<InfraHubDbContext>
+    {
+        public InfraHubDbContext CreateDbContext() => test.NouveauContexte();
+    }
+
     protected BaseDeTest()
     {
         _serveur = Environment.GetEnvironmentVariable("INFRAHUB_TEST_PG") ?? "";
