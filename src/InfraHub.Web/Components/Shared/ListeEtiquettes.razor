@@ -1,0 +1,8 @@
+@foreach (var etiquette in Etiquettes)
+{
+    <a class="etiquette" href="/?etiquette=@Uri.EscapeDataString(etiquette)">@etiquette</a>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<string> Etiquettes { get; set; } = [];
+}

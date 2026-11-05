@@ -1,0 +1,407 @@
+@page "/elements/{Slug}"
+@inject ServiceInventaire Inventaire
+@inject ServiceTypes Types
+@inject NavigationManager Navigation
+@inject TimeProvider Horloge
+
+<PageTitle>@(fiche?.Resume.Nom ?? "Élément") · Infra Hub</PageTitle>
+
+<a href="/" class="retour">← Inventaire</a>
+
+@if (introuvable)
+{
+    <h1>Élément introuvable</h1>
+    <p>Aucun élément ne porte l'identifiant <code>@Slug</code>.</p>
+}
+else if (fiche is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else
+{
+    var r = fiche.Resume;
+
+    <div class="entete">
+        <div>
+            <h1>@r.Nom</h1>
+            <div class="sous-titre">
+                <span class="pastille @(r.Categorie == Categorie.Environnement ? "env" : "dev")"></span>@r.TypeLibelle
+                <code class="muted">@r.Slug</code>
+                <BadgeStatut Statut="r.Statut" Toujours="true" />
+                <BadgeEtat Etat="r.EtatCourant" />
+                <ListeEtiquettes Etiquettes="r.Etiquettes" />
+            </div>
+        </div>
+        @if (!enEdition)
+        {
+            <div class="actions">
+                <button type="button" class="bouton" @onclick="CommencerEdition">Modifier</button>
+                <button type="button" class="bouton bouton-danger" @onclick="() => confirmerSuppression = true">Supprimer</button>
+            </div>
+        }
+    </div>
+
+    <MessageErreur Erreur="erreur" />
+
+    @if (confirmerSuppression)
+    {
+        <div class="alerte">
+            <strong>Supprimer « @r.Nom » ?</strong>
+            Ses relations (@fiche.Relations.Count), notes (@fiche.Notes.Count), liens, références de secret et observations seront supprimés aussi.
+            <div class="actions">
+                <button type="button" class="bouton bouton-danger" @onclick="SupprimerAsync">Supprimer définitivement</button>
+                <button type="button" class="bouton" @onclick="() => confirmerSuppression = false">Annuler</button>
+            </div>
+        </div>
+    }
+
+    @if (enEdition)
+    {
+        <form class="carte formulaire" @onsubmit="EnregistrerAsync">
+            <h2>Modifier</h2>
+            <div class="grille-champs">
+                <label for="nom">Nom</label>
+                <input id="nom" @bind="editNom" required />
+                <label for="slug">Identifiant</label>
+                <input id="slug" @bind="editSlug" required />
+                <label for="statut">Statut</label>
+                <select id="statut" @bind="editStatut">
+                    <option value="@StatutElement.Actif">Actif</option>
+                    <option value="@StatutElement.EnProjet">En projet</option>
+                    <option value="@StatutElement.Archive">Archivé</option>
+                </select>
+                <label for="etiquettes">Étiquettes</label>
+                <input id="etiquettes" @bind="editEtiquettes" placeholder="séparées par des virgules" />
+                <label for="description">Description</label>
+                <textarea id="description" rows="4" @bind="editDescription"></textarea>
+            </div>
+            <h2>Attributs</h2>
+            <EditeurAttributs Modele="editAttributs!" />
+            <div class="actions">
+                <button type="submit" class="bouton bouton-principal" disabled="@enCours">Enregistrer</button>
+                <button type="button" class="bouton" @onclick="() => { enEdition = false; erreur = null; }">Annuler</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <div class="colonnes">
+            <section class="carte">
+                <h2>Description</h2>
+                @if (string.IsNullOrWhiteSpace(fiche.Description))
+                {
+                    <p class="muted">Pas de description.</p>
+                }
+                else
+                {
+                    <p class="texte-libre">@fiche.Description</p>
+                }
+
+                <h2>Attributs</h2>
+                @{
+                    var remplis = ModeleAttributs.Depuis(fiche.SchemaAttributs, fiche.Attributs).Remplis().ToList();
+                }
+                @if (remplis.Count == 0)
+                {
+                    <p class="muted">Aucun attribut renseigné.</p>
+                }
+                else
+                {
+                    <dl class="attributs">
+                        @foreach (var (libelle, valeur, genre) in remplis)
+                        {
+                            <dt>@libelle</dt>
+                            <dd>
+                                @if (genre == GenreChamp.Url && Uri.TryCreate(valeur, UriKind.Absolute, out var u) && u.Scheme is "http" or "https")
+                                {
+                                    <a href="@u" target="_blank" rel="noopener noreferrer">@valeur</a>
+                                }
+                                else
+                                {
+                                    @valeur
+                                }
+                            </dd>
+                        }
+                    </dl>
+                }
+            </section>
+
+            <section class="carte">
+                <h2>Informations</h2>
+                <dl class="attributs">
+                    <dt>Créé</dt><dd>@Affichage.Date(fiche.CreeLe)</dd>
+                    <dt>Modifié</dt><dd>@Affichage.Date(r.ModifieLe)</dd>
+                    <dt>Dernière observation</dt><dd>@Affichage.Date(fiche.EtatObserveLe)</dd>
+                    @if (fiche.Source is not null)
+                    {
+                        <dt>Source</dt><dd>@fiche.Source <code>@fiche.IdExterne</code></dd>
+                    }
+                </dl>
+            </section>
+        </div>
+    }
+
+    <section class="carte">
+        <h2>Relations</h2>
+        @if (fiche.Relations.Count == 0)
+        {
+            <p class="muted">Aucune relation.</p>
+        }
+        else
+        {
+            <ul class="liste">
+                @foreach (var rel in fiche.Relations)
+                {
+                    <li @key="rel.Id">
+                        <span class="verbe">@rel.Verbe</span>
+                        <a href="/elements/@rel.AutreSlug">@rel.AutreNom</a>
+                        <span class="muted">@rel.AutreTypeLibelle</span>
+                        @if (rel.Origine == OrigineRelation.Collecte)
+                        {
+                            <span class="badge etat-inconnu" title="Créée par l'agent">collecte</span>
+                        }
+                        <button type="button" class="bouton-lien" title="Supprimer la relation" @onclick="() => Executer(() => Inventaire.SupprimerRelationAsync(rel.Id))">✕</button>
+                    </li>
+                }
+            </ul>
+        }
+        <form class="ligne-ajout" @onsubmit="RelierAsync">
+            <select aria-label="Relation" @bind="nouvelleRelation">
+                <option value="">Relation…</option>
+                @foreach (var t in typesRelation)
+                {
+                    <option value="→@t.Code">@t.Libelle…</option>
+                }
+                @foreach (var t in typesRelation)
+                {
+                    <option value="←@t.Code">@t.LibelleInverse…</option>
+                }
+            </select>
+            <select aria-label="Élément relié" @bind="nouvelleCible">
+                <option value="">Élément…</option>
+                @foreach (var e in autres)
+                {
+                    <option value="@e.Id">@e.Nom (@e.TypeLibelle)</option>
+                }
+            </select>
+            <button type="submit" class="bouton bouton-petit" disabled="@(string.IsNullOrEmpty(nouvelleRelation) || string.IsNullOrEmpty(nouvelleCible))">Relier</button>
+        </form>
+    </section>
+
+    <div class="colonnes">
+        <section class="carte">
+            <h2>Liens</h2>
+            @if (fiche.Liens.Count > 0)
+            {
+                <ul class="liste">
+                    @foreach (var lien in fiche.Liens)
+                    {
+                        <li @key="lien.Id">
+                            <a href="@lien.Url" target="_blank" rel="noopener noreferrer">@lien.Libelle</a>
+                            <span class="muted petit tronque">@lien.Url.Host</span>
+                            <button type="button" class="bouton-lien" title="Supprimer le lien" @onclick="() => Executer(() => Inventaire.SupprimerLienAsync(lien.Id))">✕</button>
+                        </li>
+                    }
+                </ul>
+            }
+            <form class="ligne-ajout" @onsubmit="AjouterLienAsync">
+                <input aria-label="Libellé du lien" placeholder="Libellé" @bind="lienLibelle" />
+                <input aria-label="Adresse" type="url" placeholder="https://…" @bind="lienUrl" />
+                <button type="submit" class="bouton bouton-petit">Ajouter</button>
+            </form>
+        </section>
+
+        <section class="carte">
+            <h2>Secrets</h2>
+            <p class="muted petit">Seulement l'emplacement dans le gestionnaire de mots de passe, jamais la valeur.</p>
+            @if (fiche.Secrets.Count > 0)
+            {
+                <ul class="liste">
+                    @foreach (var secret in fiche.Secrets)
+                    {
+                        <li @key="secret.Id">
+                            <span>@secret.Libelle</span>
+                            <code class="tronque">@secret.Reference</code>
+                            <button type="button" class="bouton-lien" title="Supprimer la référence" @onclick="() => Executer(() => Inventaire.SupprimerSecretAsync(secret.Id))">✕</button>
+                        </li>
+                    }
+                </ul>
+            }
+            <form class="ligne-ajout" @onsubmit="AjouterSecretAsync">
+                <input aria-label="Libellé du secret" placeholder="Libellé" @bind="secretLibelle" />
+                <input aria-label="Référence" placeholder="op://Coffre/Élément/champ" @bind="secretReference" />
+                <button type="submit" class="bouton bouton-petit">Ajouter</button>
+            </form>
+        </section>
+    </div>
+
+    <section class="carte">
+        <h2>Notes</h2>
+        <form class="formulaire-note" @onsubmit="AjouterNoteAsync">
+            <textarea aria-label="Nouvelle note" rows="3" placeholder="Ajouter une note…" @bind="note" @bind:event="oninput"></textarea>
+            <button type="submit" class="bouton bouton-petit" disabled="@string.IsNullOrWhiteSpace(note)">Ajouter la note</button>
+        </form>
+        @foreach (var n in fiche.Notes)
+        {
+            <article class="note" @key="n.Id">
+                <header>
+                    <strong>@Affichage.Libelle(n.Auteur)</strong>
+                    <span class="muted" title="@Affichage.Date(n.CreeLe)">@Affichage.Depuis(n.CreeLe, Horloge.GetUtcNow())</span>
+                    <button type="button" class="bouton-lien" title="Supprimer la note" @onclick="() => Executer(() => Inventaire.SupprimerNoteAsync(n.Id))">✕</button>
+                </header>
+                <p class="texte-libre">@n.Contenu</p>
+            </article>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+
+    private FicheElement? fiche;
+    private bool introuvable;
+    private ErreurMetier? erreur;
+    private bool enCours;
+    private bool confirmerSuppression;
+
+    private IReadOnlyList<TypeRelation> typesRelation = [];
+    private IReadOnlyList<ResumeElement> autres = [];
+
+    private bool enEdition;
+    private string editNom = "";
+    private string editSlug = "";
+    private StatutElement editStatut;
+    private string? editEtiquettes;
+    private string? editDescription;
+    private ModeleAttributs? editAttributs;
+
+    private string? nouvelleRelation;
+    private string? nouvelleCible;
+    private string? lienLibelle;
+    private string? lienUrl;
+    private string? secretLibelle;
+    private string? secretReference;
+    private string? note;
+
+    protected override async Task OnInitializedAsync() => typesRelation = await Inventaire.TypesRelationAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        enEdition = false;
+        confirmerSuppression = false;
+        erreur = null;
+        await RechargerAsync();
+    }
+
+    private async Task RechargerAsync()
+    {
+        fiche = await Inventaire.FicheAsync(Slug);
+        introuvable = fiche is null;
+        if (fiche is not null)
+        {
+            autres = [.. (await Inventaire.RechercherAsync(new FiltreElements())).Where(e => e.Id != fiche.Resume.Id)];
+        }
+    }
+
+    private void CommencerEdition()
+    {
+        var r = fiche!.Resume;
+        editNom = r.Nom;
+        editSlug = r.Slug;
+        editStatut = r.Statut;
+        editEtiquettes = string.Join(", ", r.Etiquettes);
+        editDescription = fiche.Description;
+        editAttributs = ModeleAttributs.Depuis(fiche.SchemaAttributs, fiche.Attributs);
+        erreur = null;
+        enEdition = true;
+    }
+
+    private async Task EnregistrerAsync()
+    {
+        enCours = true;
+        erreur = null;
+        try
+        {
+            var id = fiche!.Resume.Id;
+            await Inventaire.ModifierElementAsync(id, new ModificationElement(
+                editNom, editSlug, editDescription, editStatut, Affichage.Etiquettes(editEtiquettes), editAttributs!.VersJson()));
+
+            var nouveauSlug = InfraHub.Core.Services.Slug.Depuis(editSlug);
+            enEdition = false;
+            if (nouveauSlug != Slug)
+            {
+                Navigation.NavigateTo($"/elements/{nouveauSlug}", replace: true);
+                return;
+            }
+
+            await RechargerAsync();
+        }
+        catch (ErreurMetier ex)
+        {
+            erreur = ex;
+        }
+        finally
+        {
+            enCours = false;
+        }
+    }
+
+    private async Task SupprimerAsync()
+    {
+        try
+        {
+            await Inventaire.SupprimerElementAsync(fiche!.Resume.Id);
+            Navigation.NavigateTo("/");
+        }
+        catch (ErreurMetier ex)
+        {
+            erreur = ex;
+        }
+    }
+
+    private Task RelierAsync()
+    {
+        var sortante = nouvelleRelation![0] == '→';
+        var code = nouvelleRelation[1..];
+        var autre = Guid.Parse(nouvelleCible!);
+        var moi = fiche!.Resume.Id;
+        return Executer(async () =>
+        {
+            await Inventaire.RelierAsync(sortante ? moi : autre, code, sortante ? autre : moi);
+            nouvelleRelation = nouvelleCible = null;
+        });
+    }
+
+    private Task AjouterLienAsync() => Executer(async () =>
+    {
+        await Inventaire.AjouterLienAsync(fiche!.Resume.Id, lienLibelle ?? "", lienUrl ?? "");
+        lienLibelle = lienUrl = null;
+    });
+
+    private Task AjouterSecretAsync() => Executer(async () =>
+    {
+        await Inventaire.AjouterSecretAsync(fiche!.Resume.Id, secretLibelle ?? "", secretReference ?? "");
+        secretLibelle = secretReference = null;
+    });
+
+    private Task AjouterNoteAsync() => Executer(async () =>
+    {
+        await Inventaire.AjouterNoteAsync(fiche!.Resume.Id, note ?? "");
+        note = null;
+    });
+
+    /// <summary>Exécute une opération, affiche l'erreur métier éventuelle, puis recharge la fiche.</summary>
+    private async Task Executer(Func<Task> operation)
+    {
+        erreur = null;
+        try
+        {
+            await operation();
+            await RechargerAsync();
+        }
+        catch (ErreurMetier ex)
+        {
+            erreur = ex;
+        }
+    }
+}

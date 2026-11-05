@@ -1,0 +1,35 @@
+<li>
+    <div class="noeud">
+        @if (Noeud.Enfants.Count > 0)
+        {
+            <button type="button" class="bascule" aria-expanded="@ouvert" @onclick="() => ouvert = !ouvert">@(ouvert ? "▾" : "▸")</button>
+        }
+        else
+        {
+            <span class="bascule"></span>
+        }
+        <a href="/elements/@Noeud.Element.Slug">@Noeud.Element.Nom</a>
+        <span class="muted">@Noeud.Element.TypeLibelle</span>
+        <BadgeStatut Statut="Noeud.Element.Statut" />
+        <BadgeEtat Etat="Noeud.Element.EtatCourant" />
+        @if (Noeud.Enfants.Count > 0)
+        {
+            <span class="muted petit">(@Noeud.Enfants.Count)</span>
+        }
+    </div>
+    @if (ouvert && Noeud.Enfants.Count > 0)
+    {
+        <ul>
+            @foreach (var enfant in Noeud.Enfants)
+            {
+                <NoeudArborescence Noeud="enfant" @key="enfant.Element.Id" />
+            }
+        </ul>
+    }
+</li>
+
+@code {
+    [Parameter, EditorRequired] public NoeudArbre Noeud { get; set; } = null!;
+
+    private bool ouvert = true;
+}

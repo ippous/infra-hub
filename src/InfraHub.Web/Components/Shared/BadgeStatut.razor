@@ -1,0 +1,11 @@
+@if (Statut != StatutElement.Actif || Toujours)
+{
+    <span class="badge @Affichage.Classe(Statut)">@Affichage.Libelle(Statut)</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public StatutElement Statut { get; set; }
+
+    /// <summary>Afficher aussi « Actif » (masqué par défaut dans les listes).</summary>
+    [Parameter] public bool Toujours { get; set; }
+}

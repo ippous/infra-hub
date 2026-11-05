@@ -1,0 +1,15 @@
+@if (Etat != EtatSante.Inconnu)
+{
+    <span class="badge @Affichage.Classe(Etat)" title="État observé">@Affichage.Libelle(Etat)</span>
+}
+else if (AfficherInconnu)
+{
+    <span class="muted" title="Aucune collecte pour l'instant">—</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public EtatSante Etat { get; set; }
+
+    /// <summary>Afficher un tiret quand l'état est inconnu (colonnes de tableau).</summary>
+    [Parameter] public bool AfficherInconnu { get; set; }
+}

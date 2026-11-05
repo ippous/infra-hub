@@ -12,7 +12,8 @@ internal sealed class TypeElementConfiguration : IEntityTypeConfiguration<TypeEl
         b.HasKey(t => t.Code);
         b.Property(t => t.Code).HasMaxLength(40);
         b.Property(t => t.Libelle).HasMaxLength(100);
-        b.Property(t => t.SchemaAttributs).HasColumnType("jsonb");
+        // json (et non jsonb) : conserve l'ordre des propriétés tel qu'écrit, qui fixe l'ordre des champs du formulaire.
+        b.Property(t => t.SchemaAttributs).HasColumnType("json");
         b.Property(t => t.Icone).HasMaxLength(40);
     }
 }

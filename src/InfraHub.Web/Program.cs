@@ -1,4 +1,6 @@
 using InfraHub.Core;
+using InfraHub.Core.Domaine;
+using InfraHub.Core.Donnees;
 using InfraHub.Core.Services;
 using InfraHub.Web.Components;
 using Microsoft.AspNetCore.DataProtection;
@@ -32,6 +34,10 @@ if (builder.Configuration["DataProtection:Dossier"] is { Length: > 0 } dossierCl
 // Base PostgreSQL et services métier partagés
 builder.Services.AjouterInfraHubCore(builder.Configuration);
 
+// Les modifications faites depuis l'interface sont journalisées avec le canal « Ui ».
+// (Les futures routes /api et /mcp fixeront leur propre canal dans leur portée.)
+builder.Services.AddScoped(_ => new ContexteOperation { Canal = Canal.Ui });
+
 // À venir :
 // - API REST sous /api
 // - serveur MCP sous /mcp (même processus)
@@ -43,6 +49,7 @@ app.UseForwardedHeaders();
 // Seul le web applique les migrations : l'agent attend que le schéma soit en place.
 await using (var scope = app.Services.CreateAsyncScope())
 {
+    scope.ServiceProvider.GetRequiredService<ContexteOperation>().Canal = Canal.Systeme;
     await scope.ServiceProvider.GetRequiredService<InitialiseurBase>().InitialiserAsync();
 }
 

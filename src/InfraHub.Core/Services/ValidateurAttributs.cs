@@ -36,12 +36,21 @@ public static class ValidateurAttributs
             return [];
         }
 
-        return (resultat.Details ?? [])
-            .Where(d => d.Errors is { Count: > 0 })
+        // Le schéma racine répète en termes génériques (« Some properties did not match… ») les erreurs
+        // déjà détaillées par propriété : on ne le garde que s'il n'y a rien de plus précis.
+        var details = (resultat.Details ?? []).Where(d => d.Errors is { Count: > 0 }).ToList();
+        if (details.Exists(d => !EstRacine(d)))
+        {
+            details.RemoveAll(EstRacine);
+        }
+
+        return details
             .SelectMany(d => d.Errors!.Values.Select(message => $"{Emplacement(d)}{message}"))
             .Distinct(StringComparer.Ordinal)
             .ToList();
     }
+
+    private static bool EstRacine(EvaluationResults detail) => detail.InstanceLocation.ToString() is "" or "/";
 
     private static string Emplacement(EvaluationResults detail)
     {

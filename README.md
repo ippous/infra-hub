@@ -2,7 +2,7 @@
 
 Inventaire vivant de mes **environnements** (VPS, NAS, PaaS, bases managées, domaines…) et de mes **développements** (sites, applis, code source, outils), avec leurs relations, leur état et un assistant IA.
 
-> État : schéma de données en place (voir [docs/schema.md](docs/schema.md)). Prochaine étape : écrans d'inventaire.
+> État : schéma de données ([docs/schema.md](docs/schema.md)) et écrans d'inventaire en place ; déploiement Hostinger prêt ([docs/hebergement.md](docs/hebergement.md)). Prochaine étape : authentification, puis MCP en lecture seule.
 
 ## Architecture
 

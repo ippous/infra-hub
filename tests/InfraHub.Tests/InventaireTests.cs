@@ -29,6 +29,17 @@ public class InventaireTests : BaseDeTest
     }
 
     [Fact]
+    public async Task L_ordre_des_proprietes_du_schema_est_conserve()
+    {
+        await using var db = NouveauContexte();
+        var vps = await db.TypesElement.AsNoTracking().SingleAsync(t => t.Code == "vps", Ct);
+
+        var ordre = vps.SchemaAttributs!.RootElement.GetProperty("properties").EnumerateObject().Select(p => p.Name);
+
+        Assert.Equal(["fournisseur", "ip", "os", "region", "offre"], ordre);
+    }
+
+    [Fact]
     public async Task Creer_element_fabrique_un_slug_unique()
     {
         await using var db = NouveauContexte();

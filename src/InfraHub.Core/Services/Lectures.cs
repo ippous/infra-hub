@@ -69,10 +69,11 @@ public sealed record FicheElement(
 /// <summary>Nœud de l'arborescence construite par les relations « fait partie de ».</summary>
 public sealed record NoeudArbre(ResumeElement Element, IReadOnlyList<NoeudArbre> Enfants);
 
-/// <summary>Champs généraux modifiables d'un élément (les attributs ont leur propre opération).</summary>
+/// <summary>Champs modifiables d'un élément. Attributs null = inchangés.</summary>
 public sealed record ModificationElement(
     string Nom,
     string Slug,
     string? Description,
     StatutElement Statut,
-    IReadOnlyList<string> Etiquettes);
+    IReadOnlyList<string> Etiquettes,
+    JsonDocument? Attributs = null);

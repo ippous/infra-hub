@@ -1,0 +1,105 @@
+@page "/elements/nouveau"
+@inject ServiceInventaire Inventaire
+@inject ServiceTypes Types
+@inject NavigationManager Navigation
+
+<PageTitle>Nouvel élément · Infra Hub</PageTitle>
+
+<a href="/" class="retour">← Inventaire</a>
+<h1>Nouvel élément</h1>
+
+<MessageErreur Erreur="erreur" />
+
+<form class="carte formulaire" @onsubmit="CreerAsync">
+    <div class="grille-champs">
+        <label for="type">Type</label>
+        <select id="type" @bind="TypeCode" @bind:after="ChangerType" required>
+            <option value="">Choisir…</option>
+            @foreach (var groupe in types.GroupBy(t => t.Type.Categorie))
+            {
+                <optgroup label="@Affichage.Libelle(groupe.Key)">
+                    @foreach (var t in groupe)
+                    {
+                        <option value="@t.Type.Code">@t.Type.Libelle</option>
+                    }
+                </optgroup>
+            }
+        </select>
+
+        <label for="nom">Nom</label>
+        <input id="nom" @bind="nom" @bind:event="oninput" required placeholder="ex. VPS Hostinger" />
+
+        <label for="slug">Identifiant</label>
+        <input id="slug" @bind="slug" placeholder="@(string.IsNullOrWhiteSpace(nom) ? "automatique" : Slug.Depuis(nom))" />
+
+        <label for="statut">Statut</label>
+        <select id="statut" @bind="statut">
+            <option value="@StatutElement.Actif">Actif</option>
+            <option value="@StatutElement.EnProjet">En projet</option>
+            <option value="@StatutElement.Archive">Archivé</option>
+        </select>
+
+        <label for="etiquettes">Étiquettes</label>
+        <input id="etiquettes" @bind="etiquettes" placeholder="prod, docker…" />
+
+        <label for="description">Description</label>
+        <textarea id="description" rows="3" @bind="description"></textarea>
+    </div>
+
+    @if (attributs is not null)
+    {
+        <h2>Attributs</h2>
+        <EditeurAttributs Modele="attributs" />
+    }
+
+    <div class="actions">
+        <button type="submit" class="bouton bouton-principal" disabled="@(enCours || string.IsNullOrEmpty(TypeCode) || string.IsNullOrWhiteSpace(nom))">Créer</button>
+        <a href="/" class="bouton">Annuler</a>
+    </div>
+</form>
+
+@code {
+    [SupplyParameterFromQuery(Name = "type")] public string? TypeCode { get; set; }
+
+    private IReadOnlyList<TypeAffiche> types = [];
+    private ModeleAttributs? attributs;
+    private string nom = "";
+    private string? slug;
+    private string? etiquettes;
+    private string? description;
+    private StatutElement statut = StatutElement.Actif;
+    private ErreurMetier? erreur;
+    private bool enCours;
+
+    protected override async Task OnInitializedAsync()
+    {
+        types = await Types.ListerAsync();
+        ChangerType();
+    }
+
+    private void ChangerType()
+    {
+        var type = types.FirstOrDefault(t => t.Type.Code == TypeCode)?.Type;
+        attributs = type is null ? null : ModeleAttributs.Depuis(type.SchemaAttributs, null);
+    }
+
+    private async Task CreerAsync()
+    {
+        enCours = true;
+        erreur = null;
+        try
+        {
+            var element = await Inventaire.CreerElementAsync(new NouvelElement(
+                TypeCode!, nom, slug, description, attributs?.VersJson(), Affichage.Etiquettes(etiquettes), statut));
+            Navigation.NavigateTo($"/elements/{element.Slug}");
+        }
+        catch (ErreurMetier ex)
+        {
+            erreur = ex;
+        }
+        finally
+        {
+            enCours = false;
+        }
+    }
+}

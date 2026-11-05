@@ -65,7 +65,8 @@ public sealed class ServiceInventaire(IDbContextFactory<InfraHubDbContext> fabri
             requete = requete.Where(e => e.EtatCourant == etat);
         }
 
-        return await ProjeterResume(requete.OrderBy(e => e.Nom)).ToListAsync(ct).ConfigureAwait(false);
+        var resultats = await ProjeterResume(requete).ToListAsync(ct).ConfigureAwait(false);
+        return [.. resultats.OrderBy(e => e.Nom, Tri.Noms)];
     }
 
     public async Task<FicheElement?> FicheAsync(string slug, CancellationToken ct = default)
@@ -104,10 +105,10 @@ public sealed class ServiceInventaire(IDbContextFactory<InfraHubDbContext> fabri
             element.IdExterne,
             element.EtatObserveLe,
             element.CreeLe,
-            [.. sortantes.Concat(entrantes).OrderBy(r => r.Verbe, StringComparer.CurrentCulture).ThenBy(r => r.AutreNom, StringComparer.CurrentCulture)],
+            [.. sortantes.Concat(entrantes).OrderBy(r => r.Verbe, Tri.Noms).ThenBy(r => r.AutreNom, Tri.Noms)],
             [.. element.Notes.OrderByDescending(n => n.CreeLe).Select(n => new NoteAffichee(n.Id, n.Contenu, n.Auteur, n.CreeLe))],
-            [.. element.Liens.OrderBy(l => l.Libelle, StringComparer.CurrentCulture).Select(l => new LienAffiche(l.Id, l.Libelle, l.Url))],
-            [.. element.Secrets.OrderBy(s => s.Libelle, StringComparer.CurrentCulture).Select(s => new SecretAffiche(s.Id, s.Libelle, s.Reference))]);
+            [.. element.Liens.OrderBy(l => l.Libelle, Tri.Noms).Select(l => new LienAffiche(l.Id, l.Libelle, l.Url))],
+            [.. element.Secrets.OrderBy(s => s.Libelle, Tri.Noms).Select(s => new SecretAffiche(s.Id, s.Libelle, s.Reference))]);
     }
 
     /// <summary>
@@ -140,7 +141,7 @@ public sealed class ServiceInventaire(IDbContextFactory<InfraHubDbContext> fabri
             var enfants = enfantsParParent[id]
                 .Where(e => !chemin.Contains(e)) // garde-fou : les boucles sont refusées à l'écriture
                 .Select(e => Construire(e, [.. chemin]))
-                .OrderBy(n => n.Element.Nom, StringComparer.CurrentCulture)
+                .OrderBy(n => n.Element.Nom, Tri.Noms)
                 .ToList();
             return new NoeudArbre(elements[id], enfants);
         }
@@ -149,7 +150,7 @@ public sealed class ServiceInventaire(IDbContextFactory<InfraHubDbContext> fabri
             .Where(id => !avecParent.Contains(id))
             .Select(id => Construire(id, []))
             .OrderBy(n => n.Element.Categorie)
-            .ThenBy(n => n.Element.Nom, StringComparer.CurrentCulture)];
+            .ThenBy(n => n.Element.Nom, Tri.Noms)];
     }
 
     public async Task<IReadOnlyList<string>> EtiquettesAsync(CancellationToken ct = default)
@@ -205,7 +206,17 @@ public sealed class ServiceInventaire(IDbContextFactory<InfraHubDbContext> fabri
         ArgumentNullException.ThrowIfNull(modification);
         await using var db = await fabrique.CreateDbContextAsync(ct).ConfigureAwait(false);
 
-        var element = await TrouverAsync(db, elementId, ct).ConfigureAwait(false);
+        var element = await db.Elements.Include(e => e.Type).FirstOrDefaultAsync(e => e.Id == elementId, ct).ConfigureAwait(false)
+            ?? throw new ErreurMetier("Élément introuvable.");
+        if (modification.Attributs is not null)
+        {
+            VerifierAttributs(element.Type!, modification.Attributs);
+            if (!JsonElement.DeepEquals(element.Attributs.RootElement, modification.Attributs.RootElement))
+            {
+                element.Attributs = modification.Attributs;
+            }
+        }
+
         var slug = Slug.Depuis(modification.Slug ?? "");
         await VerifierSlugAsync(db, slug, elementId, ct).ConfigureAwait(false);
 

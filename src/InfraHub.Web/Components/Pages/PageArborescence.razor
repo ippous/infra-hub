@@ -1,0 +1,41 @@
+@page "/arborescence"
+@inject ServiceInventaire Inventaire
+
+<PageTitle>Arborescence · Infra Hub</PageTitle>
+
+<div class="entete">
+    <h1>Arborescence</h1>
+    <label class="case">
+        <input type="checkbox" @bind="inclureArchives" @bind:after="ChargerAsync" /> Inclure les archivés
+    </label>
+</div>
+<p class="muted">Construite à partir des relations « fait partie de ». Les éléments qui ne font partie de rien sont à la racine.</p>
+
+@if (racines is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else if (racines.Count == 0)
+{
+    <div class="vide"><p>Rien à afficher pour l'instant.</p></div>
+}
+else
+{
+    <div class="carte">
+        <ul class="arbre">
+            @foreach (var noeud in racines)
+            {
+                <NoeudArborescence Noeud="noeud" @key="noeud.Element.Id" />
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<NoeudArbre>? racines;
+    private bool inclureArchives;
+
+    protected override Task OnInitializedAsync() => ChargerAsync();
+
+    private async Task ChargerAsync() => racines = await Inventaire.ArborescenceAsync(inclureArchives);
+}

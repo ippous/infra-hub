@@ -2,8 +2,18 @@
 
 <header class="topbar">
     <a href="/" class="brand">Infra Hub</a>
+    <nav class="nav">
+        <NavLink href="/" Match="NavLinkMatch.All">Inventaire</NavLink>
+        <NavLink href="/arborescence">Arborescence</NavLink>
+        <NavLink href="/types">Types</NavLink>
+    </nav>
+    <a href="/elements/nouveau" class="bouton bouton-principal bouton-petit">+ Nouvel élément</a>
 </header>
 
 <main class="content">
     @Body
 </main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Une erreur est survenue. <a href="." class="reload">Recharger</a>
+</div>

@@ -1,0 +1,73 @@
+<div class="grille-champs">
+    @foreach (var champ in Modele.Champs)
+    {
+        var id = $"attr-{champ.Nom}";
+        <label for="@id">@champ.Libelle</label>
+        @switch (champ.Genre)
+        {
+            case GenreChamp.Booleen:
+                <select id="@id" @bind="champ.Valeur">
+                    <option value="">—</option>
+                    <option value="true">oui</option>
+                    <option value="false">non</option>
+                </select>
+                break;
+            case GenreChamp.Choix:
+                <select id="@id" @bind="champ.Valeur">
+                    <option value="">—</option>
+                    @foreach (var choix in champ.Choix)
+                    {
+                        <option value="@choix">@choix</option>
+                    }
+                </select>
+                break;
+            case GenreChamp.Date:
+                <input id="@id" type="date" value="@champ.Valeur" @onchange="e => champ.Valeur = e.Value?.ToString() ?? string.Empty" />
+                break;
+            case GenreChamp.Url:
+                <input id="@id" type="url" placeholder="https://…" @bind="champ.Valeur" />
+                break;
+            case GenreChamp.Entier:
+            case GenreChamp.Nombre:
+                <input id="@id" inputmode="decimal" @bind="champ.Valeur" />
+                break;
+            case GenreChamp.Liste:
+                <input id="@id" placeholder="valeurs séparées par des virgules" @bind="champ.Valeur" />
+                break;
+            case GenreChamp.Libre:
+                <div class="champ-libre">
+                    <input id="@id" @bind="champ.Valeur" />
+                    <button type="button" class="bouton-lien" title="Retirer cet attribut" @onclick="() => Modele.Champs.Remove(champ)">✕</button>
+                </div>
+                break;
+            default:
+                <input id="@id" @bind="champ.Valeur" />
+                break;
+        }
+    }
+</div>
+
+<div class="ajout-libre">
+    <input placeholder="Autre attribut (nom)" @bind="nouveauNom" @onkeydown="AjouterAuClavier" />
+    <button type="button" class="bouton bouton-petit" @onclick="Ajouter" disabled="@string.IsNullOrWhiteSpace(nouveauNom)">Ajouter</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ModeleAttributs Modele { get; set; } = new();
+
+    private string nouveauNom = "";
+
+    private void Ajouter()
+    {
+        Modele.AjouterLibre(nouveauNom);
+        nouveauNom = "";
+    }
+
+    private void AjouterAuClavier(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            Ajouter();
+        }
+    }
+}

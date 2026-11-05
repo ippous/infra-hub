@@ -1,0 +1,167 @@
+@page "/"
+@inject ServiceInventaire Inventaire
+@inject ServiceTypes Types
+@inject NavigationManager Navigation
+@inject TimeProvider Horloge
+
+<PageTitle>Inventaire · Infra Hub</PageTitle>
+
+<div class="entete">
+    <h1>Inventaire</h1>
+    @if (elements is not null)
+    {
+        <span class="muted">@elements.Count élément@(elements.Count > 1 ? "s" : "")</span>
+    }
+</div>
+
+<div class="filtres">
+    <input type="search" placeholder="Rechercher (nom, identifiant, description)" aria-label="Rechercher"
+           @bind="Texte" @bind:event="oninput" @bind:after="Filtrer" />
+    <select aria-label="Catégorie" @bind="FiltreCategorie" @bind:after="Filtrer">
+        <option value="">Toutes catégories</option>
+        <option value="@nameof(Categorie.Environnement)">Environnements</option>
+        <option value="@nameof(Categorie.Developpement)">Développements</option>
+    </select>
+    <select aria-label="Type" @bind="Type" @bind:after="Filtrer">
+        <option value="">Tous types</option>
+        @foreach (var t in types)
+        {
+            <option value="@t.Type.Code">@t.Type.Libelle</option>
+        }
+    </select>
+    <select aria-label="Étiquette" @bind="Etiquette" @bind:after="Filtrer">
+        <option value="">Toutes étiquettes</option>
+        @foreach (var e in etiquettes)
+        {
+            <option value="@e">@e</option>
+        }
+    </select>
+    <select aria-label="Statut" @bind="Statut" @bind:after="Filtrer">
+        <option value="">Actifs et en projet</option>
+        <option value="@nameof(StatutElement.Actif)">Actifs</option>
+        <option value="@nameof(StatutElement.EnProjet)">En projet</option>
+        <option value="@nameof(StatutElement.Archive)">Archivés</option>
+        <option value="tous">Tous</option>
+    </select>
+    @if (FiltreActif)
+    {
+        <button type="button" class="bouton-lien" @onclick="Reinitialiser">Effacer les filtres</button>
+    }
+</div>
+
+@if (elements is null)
+{
+    <p class="muted">Chargement…</p>
+}
+else if (elements.Count == 0)
+{
+    <div class="vide">
+        @if (FiltreActif)
+        {
+            <p>Aucun élément ne correspond à ces filtres.</p>
+        }
+        else
+        {
+            <p>L'inventaire est vide. Commence par ton VPS, ton NAS ou un de tes sites.</p>
+            <a href="/elements/nouveau" class="bouton bouton-principal">Ajouter un premier élément</a>
+        }
+    </div>
+}
+else
+{
+    <table class="tableau">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Type</th>
+                <th>État</th>
+                <th class="masque-mobile">Étiquettes</th>
+                <th class="masque-mobile">Modifié</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in elements)
+            {
+                <tr @key="e.Id">
+                    <td>
+                        <a href="/elements/@e.Slug" class="nom">@e.Nom</a>
+                        <BadgeStatut Statut="e.Statut" />
+                    </td>
+                    <td><span class="pastille @(e.Categorie == Categorie.Environnement ? "env" : "dev")"></span>@e.TypeLibelle</td>
+                    <td><BadgeEtat Etat="e.EtatCourant" AfficherInconnu="true" /></td>
+                    <td class="masque-mobile"><ListeEtiquettes Etiquettes="e.Etiquettes" /></td>
+                    <td class="masque-mobile muted">@Affichage.Depuis(e.ModifieLe, Horloge.GetUtcNow())</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Texte { get; set; }
+    [SupplyParameterFromQuery(Name = "categorie")] public string? FiltreCategorie { get; set; }
+    [SupplyParameterFromQuery(Name = "type")] public string? Type { get; set; }
+    [SupplyParameterFromQuery(Name = "etiquette")] public string? Etiquette { get; set; }
+    [SupplyParameterFromQuery(Name = "statut")] public string? Statut { get; set; }
+
+    private IReadOnlyList<ResumeElement>? elements;
+    private IReadOnlyList<TypeAffiche> types = [];
+    private IReadOnlyList<string> etiquettes = [];
+    private int generation;
+
+    private bool FiltreActif =>
+        !string.IsNullOrWhiteSpace(Texte) || !string.IsNullOrEmpty(FiltreCategorie) || !string.IsNullOrEmpty(Type)
+        || !string.IsNullOrEmpty(Etiquette) || !string.IsNullOrEmpty(Statut);
+
+    protected override async Task OnInitializedAsync()
+    {
+        types = await Types.ListerAsync();
+        etiquettes = await Inventaire.EtiquettesAsync();
+    }
+
+    protected override Task OnParametersSetAsync() => ChargerAsync();
+
+    private async Task Filtrer()
+    {
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["q"] = string.IsNullOrWhiteSpace(Texte) ? null : Texte,
+            ["categorie"] = NullSiVide(FiltreCategorie),
+            ["type"] = NullSiVide(Type),
+            ["etiquette"] = NullSiVide(Etiquette),
+            ["statut"] = NullSiVide(Statut),
+        }), replace: true);
+        await ChargerAsync();
+    }
+
+    private async Task Reinitialiser()
+    {
+        Texte = FiltreCategorie = Type = Etiquette = Statut = null;
+        await Filtrer();
+    }
+
+    private async Task ChargerAsync()
+    {
+        // Les frappes rapides lancent plusieurs recherches : seule la dernière est affichée.
+        var mienne = ++generation;
+        var filtre = new FiltreElements(
+            Texte: Texte,
+            Categorie: Enum.TryParse<Categorie>(FiltreCategorie, out var c) ? c : null,
+            TypeCode: NullSiVide(Type),
+            Etiquette: NullSiVide(Etiquette),
+            Statut: Enum.TryParse<StatutElement>(Statut, out var s) ? s : null);
+
+        var resultat = await Inventaire.RechercherAsync(filtre);
+        if (string.IsNullOrEmpty(Statut))
+        {
+            resultat = [.. resultat.Where(e => e.Statut != StatutElement.Archive)];
+        }
+
+        if (mienne == generation)
+        {
+            elements = resultat;
+        }
+    }
+
+    private static string? NullSiVide(string? valeur) => string.IsNullOrEmpty(valeur) ? null : valeur;
+}

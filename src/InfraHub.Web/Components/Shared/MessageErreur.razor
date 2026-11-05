@@ -1,0 +1,19 @@
+@if (Erreur is not null)
+{
+    <div class="alerte" role="alert">
+        <strong>@Erreur.Message</strong>
+        @if (Erreur.Details.Count > 0)
+        {
+            <ul>
+                @foreach (var detail in Erreur.Details)
+                {
+                    <li>@detail</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public ErreurMetier? Erreur { get; set; }
+}

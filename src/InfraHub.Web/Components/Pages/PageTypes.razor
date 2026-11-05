@@ -1,0 +1,132 @@
+@page "/types"
+@using System.Text.Json
+@inject ServiceTypes Types
+
+<PageTitle>Types · Infra Hub</PageTitle>
+
+<div class="entete">
+    <h1>Types d'élément</h1>
+    <button type="button" class="bouton" @onclick="Nouveau">+ Nouveau type</button>
+</div>
+
+@if (avertissement is not null)
+{
+    <div class="alerte alerte-info">@avertissement</div>
+}
+
+@if (edition)
+{
+    <MessageErreur Erreur="erreur" />
+    <form class="carte formulaire" @onsubmit="EnregistrerAsync">
+        <h2>@(nouveau ? "Nouveau type" : $"Modifier « {libelle} »")</h2>
+        <div class="grille-champs">
+            <label for="code">Code</label>
+            <input id="code" @bind="code" disabled="@(!nouveau)" required placeholder="ex. imprimante" />
+            <label for="libelle">Libellé</label>
+            <input id="libelle" @bind="libelle" required />
+            <label for="categorie">Catégorie</label>
+            <select id="categorie" @bind="categorie">
+                <option value="@Categorie.Environnement">Environnement</option>
+                <option value="@Categorie.Developpement">Développement</option>
+            </select>
+            <label for="icone">Icône</label>
+            <input id="icone" @bind="icone" placeholder="nom d'icône (facultatif)" />
+            <label for="schema">JSON Schema des attributs</label>
+            <textarea id="schema" class="code" rows="14" spellcheck="false" @bind="schema"
+                      placeholder='{"type":"object","properties":{"modele":{"type":"string"}}}'></textarea>
+        </div>
+        <p class="muted petit">Vide = attributs libres. Chaque propriété devient un champ du formulaire (string, integer, number, boolean, array, enum ; formats date et uri).</p>
+        <div class="actions">
+            <button type="submit" class="bouton bouton-principal">Enregistrer</button>
+            <button type="button" class="bouton" @onclick="() => edition = false">Annuler</button>
+        </div>
+    </form>
+}
+
+<table class="tableau">
+    <thead>
+        <tr><th>Type</th><th>Code</th><th>Catégorie</th><th>Attributs</th><th>Éléments</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var t in types)
+        {
+            <tr @key="t.Type.Code">
+                <td>@t.Type.Libelle</td>
+                <td><code>@t.Type.Code</code></td>
+                <td>@Affichage.Libelle(t.Type.Categorie)</td>
+                <td class="muted petit">@NomsAttributs(t.Type)</td>
+                <td>
+                    @if (t.NombreElements > 0)
+                    {
+                        <a href="/?type=@t.Type.Code">@t.NombreElements</a>
+                    }
+                    else
+                    {
+                        <span class="muted">0</span>
+                    }
+                </td>
+                <td><button type="button" class="bouton-lien" @onclick="() => Modifier(t.Type)">Modifier</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private static readonly JsonSerializerOptions Indente = new() { WriteIndented = true };
+
+    private IReadOnlyList<TypeAffiche> types = [];
+    private bool edition;
+    private bool nouveau;
+    private string code = "";
+    private string libelle = "";
+    private Categorie categorie;
+    private string? icone;
+    private string? schema;
+    private ErreurMetier? erreur;
+    private string? avertissement;
+
+    protected override async Task OnInitializedAsync() => types = await Types.ListerAsync();
+
+    private void Nouveau()
+    {
+        (nouveau, code, libelle, categorie, icone, erreur, avertissement) = (true, "", "", Categorie.Environnement, null, null, null);
+        schema = """
+            {
+              "type": "object",
+              "properties": {
+              }
+            }
+            """;
+        edition = true;
+    }
+
+    private void Modifier(TypeElement type)
+    {
+        (nouveau, code, libelle, categorie, icone, erreur, avertissement) = (false, type.Code, type.Libelle, type.Categorie, type.Icone, null, null);
+        schema = type.SchemaAttributs is null ? null : JsonSerializer.Serialize(type.SchemaAttributs.RootElement, Indente);
+        edition = true;
+    }
+
+    private async Task EnregistrerAsync()
+    {
+        erreur = null;
+        try
+        {
+            var invalides = await Types.EnregistrerAsync(code, libelle, categorie, icone, schema);
+            avertissement = invalides > 0
+                ? $"Type enregistré. Attention : {invalides} élément(s) existant(s) ne respectent plus ce schéma ; ils devront être corrigés à leur prochaine modification."
+                : null;
+            edition = false;
+            types = await Types.ListerAsync();
+        }
+        catch (ErreurMetier ex)
+        {
+            erreur = ex;
+        }
+    }
+
+    private static string NomsAttributs(TypeElement type) =>
+        type.SchemaAttributs?.RootElement.TryGetProperty("properties", out var p) == true && p.ValueKind == JsonValueKind.Object
+            ? string.Join(", ", p.EnumerateObject().Select(x => x.Name))
+            : "libres";
+}
