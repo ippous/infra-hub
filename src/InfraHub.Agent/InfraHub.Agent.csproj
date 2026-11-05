@@ -4,6 +4,12 @@
     <RootNamespace>InfraHub.Agent</RootNamespace>
   </PropertyGroup>
 
+  <!-- Fournit Microsoft.Extensions.Hosting sans version de paquet à gérer,
+       et HttpClient / Kestrel si l'agent expose un jour un point de santé. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\InfraHub.Core\InfraHub.Core.csproj" />
   </ItemGroup>
