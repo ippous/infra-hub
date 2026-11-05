@@ -73,7 +73,7 @@ dotnet ef migrations add <Nom> --project src/InfraHub.Core --startup-project src
 
 ## Déployer sur le VPS
 
-Déploiement automatique depuis GitHub Actions (images sur ghcr.io, puis `docker compose` sur le VPS en SSH).
+Le VPS récupère lui-même les images publiées sur ghcr.io par GitHub Actions (mise à jour toutes les 5 minutes).
 Mise en place pas à pas : [docs/hebergement.md](docs/hebergement.md).
 
 ## Feuille de route
