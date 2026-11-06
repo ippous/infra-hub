@@ -39,6 +39,9 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Production
       ConnectionStrings__InfraHub: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      # Collecteur Vercel : actif si VERCEL_JETON est renseigné dans .env
+      Vercel__Jeton: ${VERCEL_JETON:-}
+      Vercel__Equipe: ${VERCEL_EQUIPE:-}
     depends_on:
       db:
         condition: service_healthy

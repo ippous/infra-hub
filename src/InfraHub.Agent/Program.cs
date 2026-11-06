@@ -1,5 +1,6 @@
 using System.Text.Json;
 using InfraHub.Agent;
+using InfraHub.Agent.Collecte;
 using InfraHub.Core;
 using InfraHub.Core.Domaine;
 using InfraHub.Core.Donnees;
@@ -18,10 +19,19 @@ if (args.Length > 0 && args[0] == "importer")
     return await Importer(hoteImport.Services);
 }
 
+// Collecteurs : chacun a son intervalle ; ceux sans configuration (jeton…) sont ignorés.
+builder.Services.Configure<OptionsVercel>(builder.Configuration.GetSection(OptionsVercel.Section));
+builder.Services.AddHttpClient(CollecteurVercel.ClientHttp, (sp, c) =>
+{
+    c.BaseAddress = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OptionsVercel>>().Value.Adresse;
+    c.Timeout = TimeSpan.FromSeconds(30);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("InfraHub-Agent/1.0");
+});
+builder.Services.AddSingleton<ICollecteur, CollecteurVercel>();
+builder.Services.AddSingleton<ICollecteur, PurgeObservations>();
 builder.Services.AddHostedService<CollecteWorker>();
 
-// À venir : collecteurs GitHub, Vercel, Hostinger, Synology DSM (via Tailscale),
-// sondes HTTP / TLS, état des conteneurs Docker du VPS.
+// À venir : GitHub, Hostinger, Synology DSM (via Tailscale), sondes HTTP / TLS, conteneurs Docker du VPS.
 
 var host = builder.Build();
 await host.RunAsync();

@@ -91,6 +91,20 @@ journalctl -u infrahub-maj-images -n 50 --no-pager                            # 
 cat /var/lib/infrahub/maj-images.json                                         # résumé par projet
 ```
 
+## Collecteur Vercel
+
+L'agent lit l'équipe Vercel toutes les 15 minutes : projets (framework, version de Node, URL), dépôt GitHub, domaines et dernier déploiement de production. Il rattache les éléments saisis à la main (attribut `projet_vercel` ; dépôts par leur URL), crée les autres, relie projet → Vercel, projet → dépôt, domaine → projet, et enregistre une observation par projet (READY = OK, ERROR = en panne, BLOCKED / CANCELED = dégradé). Il n'écrit que ce qui change.
+
+Mise en place : créer un jeton sur https://vercel.com/account/settings/tokens (portée : l'équipe, avec une date d'expiration), puis dans `/opt/infrahub` :
+
+```bash
+read -rsp "Jeton Vercel : " J && echo && sed -i '/^VERCEL_/d' .env && printf 'VERCEL_JETON=%s\nVERCEL_EQUIPE=team_SJ6SmcGZ7DmAF9SYd2ihsWrP\n' "$J" >> .env && unset J
+docker compose up -d agent
+docker compose logs --since 5m agent | grep -A1 CollecteWorker
+```
+
+Sans `VERCEL_JETON`, le collecteur est désactivé. Jeton expiré ou révoqué : l'agent continue et signale « Vercel refuse le jeton » dans son journal.
+
 ## Exploitation
 
 ```bash

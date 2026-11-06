@@ -30,6 +30,7 @@ public static class ExtensionsServices
         services.AddScoped<ServiceObservations>();
         services.AddScoped<ServiceTypes>();
         services.AddScoped<ServiceImport>();
+        services.AddScoped<Services.Collecte.SynchroVercel>();
         services.AddScoped<InitialiseurBase>();
         return services;
     }

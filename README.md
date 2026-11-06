@@ -80,6 +80,6 @@ Mise en place pas à pas : [docs/hebergement.md](docs/hebergement.md).
 
 1. Socle : inventaire, relations, notes, interface
 2. MCP en lecture seule + assistant
-3. Agent : sondes HTTP / TLS, Docker du VPS, GitHub, Vercel
+3. Agent : Vercel ✅, sondes HTTP / TLS, Docker du VPS, GitHub
 4. Tailscale + Synology DSM, puis Hostinger
 5. Outils d'écriture, actions avec validation, alertes téléphone

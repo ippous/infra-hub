@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using InfraHub.Core.Domaine;
 using InfraHub.Core.Donnees;
 using Microsoft.EntityFrameworkCore;
@@ -242,6 +243,68 @@ public sealed class ServiceInventaire(IDbContextFactory<InfraHubDbContext> fabri
             ?? throw new ErreurMetier("Élément introuvable.");
         VerifierAttributs(element.Type!, attributs);
         element.Attributs = attributs;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Fusionne des attributs dans ceux de l'élément : <paramref name="imposes"/> remplacent la valeur existante,
+    /// <paramref name="siAbsents"/> ne sont écrits que si la clé manque. N'enregistre rien si rien ne change
+    /// (les collectes repassent souvent : pas d'écriture ni d'entrée d'audit inutiles). Retourne vrai si modifié.
+    /// </summary>
+    public async Task<bool> FusionnerAttributsAsync(
+        Guid elementId,
+        IReadOnlyDictionary<string, JsonNode?> imposes,
+        IReadOnlyDictionary<string, JsonNode?>? siAbsents = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(imposes);
+        await using var db = await fabrique.CreateDbContextAsync(ct).ConfigureAwait(false);
+        var element = await db.Elements.Include(e => e.Type).FirstOrDefaultAsync(e => e.Id == elementId, ct).ConfigureAwait(false)
+            ?? throw new ErreurMetier("Élément introuvable.");
+
+        var objet = JsonNode.Parse(element.Attributs.RootElement.GetRawText()) as JsonObject ?? [];
+        foreach (var (cle, valeur) in imposes)
+        {
+            objet[cle] = valeur?.DeepClone();
+        }
+
+        foreach (var (cle, valeur) in siAbsents ?? new Dictionary<string, JsonNode?>())
+        {
+            if (!objet.ContainsKey(cle) && valeur is not null)
+            {
+                objet[cle] = valeur.DeepClone();
+            }
+        }
+
+        var nouveaux = JsonDocument.Parse(objet.ToJsonString());
+        if (JsonElement.DeepEquals(element.Attributs.RootElement, nouveaux.RootElement))
+        {
+            return false;
+        }
+
+        VerifierAttributs(element.Type!, nouveaux);
+        element.Attributs = nouveaux;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>Rattache un élément saisi à la main à sa source de collecte (une seule fois).</summary>
+    public async Task RattacherSourceAsync(Guid elementId, string source, string idExterne, CancellationToken ct = default)
+    {
+        await using var db = await fabrique.CreateDbContextAsync(ct).ConfigureAwait(false);
+        var element = await TrouverAsync(db, elementId, ct).ConfigureAwait(false);
+        if (element.Source == source && element.IdExterne == idExterne)
+        {
+            return;
+        }
+
+        if (await db.Elements.AnyAsync(e => e.Source == source && e.IdExterne == idExterne && e.Id != elementId, ct).ConfigureAwait(false))
+        {
+            throw new ErreurMetier($"Un autre élément est déjà rattaché à {source}:{idExterne}.");
+        }
+
+        element.Source = source;
+        element.IdExterne = idExterne;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
