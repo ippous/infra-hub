@@ -64,7 +64,7 @@ if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
 fi
 
 echo "Origines mises à jour automatiquement :"
-timeout 300 unattended-upgrade --dry-run --debug 2>&1 | sed -n 's/^Allowed origins are: //p' | tr ',' '\n' | sed 's/^ */  /'
+timeout 300 unattended-upgrade --dry-run --debug 2>&1 | sed -n 's/^Allowed origins are: //p' | sed 's/, /\n/g' | sed 's/^/  /'
 if command -v systemctl >/dev/null && [ -d /run/systemd/system ]; then
   echo "Prochaines exécutions :"
   systemctl list-timers apt-daily.timer apt-daily-upgrade.timer --no-pager | sed -n '2,3p' | awk '{print "  " $1, $2, $3, "→", $NF}'
