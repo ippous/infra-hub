@@ -1,0 +1,70 @@
+# Dependabot : une demande de fusion par lot de mises à jour, vérifiée par le workflow build (tests PostgreSQL compris).
+# Images Docker non suivies volontairement : les étiquettes (dotnet 11.0, postgres:17, caddy:2) reçoivent déjà
+# les correctifs à chaque construction ou téléchargement ; un changement de version majeure reste une décision manuelle.
+version: 2
+
+updates:
+  # Paquets NuGet (Directory.Packages.props) et outil dotnet-ef (.config/dotnet-tools.json)
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "Dépendances"
+    groups:
+      # EF Core, Npgsql et dotnet-ef doivent avancer ensemble.
+      ef-core:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Npgsql*"
+          - "dotnet-ef"
+      tests:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+      autres:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Rester sur .NET 11 : pas de préversions 12 proposées automatiquement.
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Npgsql*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dotnet-ef"
+        update-types: ["version-update:semver-major"]
+
+  # SDK .NET de global.json (passage de la RC à la version finale, puis correctifs)
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "SDK .NET"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Actions utilisées par .github/workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: "06:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "Actions"
+    groups:
+      actions:
+        patterns:
+          - "*"
