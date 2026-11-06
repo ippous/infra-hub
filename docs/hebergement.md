@@ -73,6 +73,24 @@ systemctl list-timers apt-daily-upgrade.timer                         # prochain
 ls /var/run/reboot-required 2>/dev/null && cat /var/run/reboot-required.pkgs
 ```
 
+## Mise à jour des images Docker (chaque dimanche à 02:30)
+
+`deploy/maj-images.sh`, installé en `/usr/local/bin/infrahub-maj-images`, ne traite que les projets Compose listés dans `/etc/infrahub/maj-images.conf`. Pour chacun :
+
+1. sauvegarde des bases en marche (PostgreSQL : `pg_dumpall` ; MariaDB/MySQL : dump complet avec le mot de passe root du conteneur) dans `/var/backups/infrahub-maj-images/<projet>/`, 8 conservées par base. **Si une sauvegarde échoue, le projet n'est pas touché** ;
+2. téléchargement des images, dans leur étiquette actuelle (`postgres:17` reste en 17) ;
+3. reconstruction des images construites sur place avec une image de base fraîche (`build --pull`). En cas d'échec, les images actuelles sont conservées ;
+4. redémarrage et vérification (conteneurs en marche et « healthy »).
+
+Les images d'Infra Hub (`web`, `agent`) restent gérées par `infrahub-maj` (toutes les 5 minutes). Les images sans version fixée (`:latest` ou sans étiquette) sont signalées.
+
+```bash
+infrahub-maj-images --installer infrahub shetland-registre programmeelevage   # choix des projets + minuteur
+infrahub-maj-images --essai                                                   # ce qui changerait, sans rien toucher
+journalctl -u infrahub-maj-images -n 50 --no-pager                            # dernier passage
+cat /var/lib/infrahub/maj-images.json                                         # résumé par projet
+```
+
 ## Exploitation
 
 ```bash
