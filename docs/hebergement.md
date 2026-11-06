@@ -56,6 +56,23 @@ infra.jaume-eric.com {
 
 puis `docker exec shetland-registre-web-1 caddy reload --config /etc/caddy/Caddyfile`. Pour revenir en arrière : remettre `Caddyfile.avant-infrahub` et recharger.
 
+## Mises à jour du système
+
+`deploy/maj-systeme.sh` (lancé par l'installateur, ou seul : `curl -fsSL https://raw.githubusercontent.com/ippous/infra-hub/main/deploy/maj-systeme.sh | bash`) configure `unattended-upgrades` :
+
+- correctifs de sécurité Ubuntu et paquets Docker (`download.docker.com`) installés automatiquement ;
+- la nuit : listes rafraîchies vers 03:00, installation vers 03:30 (une mise à jour de Docker redémarre brièvement tous les conteneurs) ;
+- redémarrage automatique à 04:30, seulement si une mise à jour l'exige (`/var/run/reboot-required`) ;
+- anciens noyaux et dépendances inutiles supprimés.
+
+Les mises à jour Ubuntu hors sécurité (`noble-updates`) ne sont pas installées automatiquement. Contrôle :
+
+```bash
+cat /var/log/unattended-upgrades/unattended-upgrades.log | tail -20   # dernières installations
+systemctl list-timers apt-daily-upgrade.timer                         # prochaine exécution
+ls /var/run/reboot-required 2>/dev/null && cat /var/run/reboot-required.pkgs
+```
+
 ## Exploitation
 
 ```bash

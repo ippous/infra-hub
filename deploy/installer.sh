@@ -66,7 +66,7 @@ docker compose version >/dev/null || stop "Docker Compose introuvable."
 if command -v systemctl >/dev/null && [ -d /run/systemd/system ]; then
   systemctl enable --now docker fail2ban >/dev/null 2>&1 || true
 fi
-dpkg-reconfigure -f noninteractive unattended-upgrades >/dev/null 2>&1 || true
+curl -fsSL "$BRUT/deploy/maj-systeme.sh" | bash >/dev/null   # mises à jour système automatiques (voir le script)
 
 titre "Dossier $DOSSIER"
 install -d -m 750 "$DOSSIER" "$DOSSIER/deploy" "$DOSSIER/sauvegardes"
